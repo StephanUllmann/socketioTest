@@ -10,7 +10,7 @@ const io = new Server(server, {
   cors: {
     origin: [
       "http://localhost:5173",
-      "https://main--luxury-mochi-9f35c6.netlify.app/",
+      "https://luxury-mochi-9f35c6.netlify.app/",
     ],
   },
 });
