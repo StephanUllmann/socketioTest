@@ -1,9 +1,15 @@
 const express = require("express");
 const { Server } = require("socket.io");
+const authSocket = require("./middlewares/authSocket");
 const app = express();
+const cors = require("cors");
 const http = require("http");
 require("dotenv").config();
 const port = process.env.PORT || 5555;
+const connectDB = require("./dbinit");
+const Room = require("./schemas/Room");
+const User = require("./schemas/User");
+connectDB();
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -15,16 +21,63 @@ const io = new Server(server, {
   },
 });
 
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+const userRoutes = require("./routes/user");
+
 app.get("/", (req, res) => {
   res.send("socket.io server listening");
 });
 
-io.on("connection", (socket) => {
-  console.log(`a user connected on socket.id: ${socket.id}`);
+app.use("/user", userRoutes);
+const wrap = (middleware) => (socket, next) => middleware(socket, next);
+io.use(wrap(authSocket));
 
-  socket.on("message", (message) => {
-    console.log(message);
-    socket.broadcast.emit("serverEvent", { message, id: socket.id });
+io.on("connection", (socket) => {
+  console.log(`a user connected with as: ${socket.user}`);
+  socket.emit("user-rooms", socket.user.rooms);
+  // console.log("This is the socket: ", socket);
+
+  socket.on("join-room", async (room, callback) => {
+    const foundRoom = await Room.findOneAndUpdate(
+      { roomName: room },
+      { $setOnInsert: { roomName: room } },
+      { upsert: true, new: true }
+    );
+    const user = await User.findOneAndUpdate(
+      {
+        username: socket.user.username,
+      },
+      { $addToSet: { rooms: foundRoom.roomName } }
+    );
+    socket.join(foundRoom.roomName);
+    callback({ roomName: foundRoom.roomName, messages: foundRoom.messages });
+  });
+
+  socket.on("leave-room", (room) => {
+    socket.leave(room);
+  });
+
+  socket.on("message", (message, time, room) => {
+    if (!room) {
+      // console.log("no room message: ", message);
+      // console.log("username: ", socket.user.username);
+      socket.broadcast.emit("receiveMessages", {
+        message,
+        username: socket.user.username,
+        time,
+      });
+    } else {
+      // console.log(`${room} message: `, message);
+      // console.log("username: ", socket.user.username);
+      socket.to(room).emit("receiveMessages", {
+        message,
+        username: socket.user.username,
+        time,
+      });
+    }
   });
 
   socket.on("disconnect", () => {
