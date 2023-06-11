@@ -36,8 +36,8 @@ const wrap = (middleware) => (socket, next) => middleware(socket, next);
 io.use(wrap(authSocket));
 
 io.on("connection", (socket) => {
-  // console.log(`a user connected with as: ${socket.user}`);
-  socket.emit("user-rooms", socket.user.rooms);
+  console.log(`a user connected with as: ${socket.user}`);
+  socket.emit("get-user-rooms", socket.user.rooms);
   // console.log("This is the socket: ", socket);
 
   socket.on("join-room", async (room, callback) => {
@@ -61,7 +61,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("message", async (message, time, room) => {
-    if (!room) {
+    if (!room || room === "") {
       // console.log("no room message: ", message);
       // console.log("username: ", socket.user.username);
       socket.broadcast.emit("receiveMessages", {
