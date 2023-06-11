@@ -36,7 +36,7 @@ const wrap = (middleware) => (socket, next) => middleware(socket, next);
 io.use(wrap(authSocket));
 
 io.on("connection", (socket) => {
-  console.log(`a user connected with as: ${socket.user}`);
+  // console.log(`a user connected with as: ${socket.user}`);
   socket.emit("user-rooms", socket.user.rooms);
   // console.log("This is the socket: ", socket);
 
@@ -60,7 +60,7 @@ io.on("connection", (socket) => {
     socket.leave(room);
   });
 
-  socket.on("message", (message, time, room) => {
+  socket.on("message", async (message, time, room) => {
     if (!room) {
       // console.log("no room message: ", message);
       // console.log("username: ", socket.user.username);
@@ -72,6 +72,24 @@ io.on("connection", (socket) => {
     } else {
       // console.log(`${room} message: `, message);
       // console.log("username: ", socket.user.username);
+      // console.log("user: ", socket.user);
+      // console.log("time: ", time);
+
+      const messageDB = await Room.findOneAndUpdate(
+        { roomName: room },
+        {
+          $push: {
+            messages: {
+              message,
+              username: socket.user.username,
+              userId: socket.user._id,
+              time,
+            },
+          },
+        },
+        { upsert: true }
+      );
+      // console.log(messageDB);
       socket.to(room).emit("receiveMessages", {
         message,
         username: socket.user.username,

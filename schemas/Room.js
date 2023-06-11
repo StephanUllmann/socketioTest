@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const roomMessages = new mongoose.Schema({
   message: String,
   username: String,
+  userId: mongoose.ObjectId,
   time: String,
 });
 
@@ -13,7 +14,7 @@ const roomSchema = new mongoose.Schema({
     unique: true,
   },
   messages: {
-    type: roomMessages,
+    type: [roomMessages],
   },
 });
 
