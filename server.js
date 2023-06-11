@@ -35,6 +35,25 @@ app.use("/user", userRoutes);
 const wrap = (middleware) => (socket, next) => middleware(socket, next);
 io.use(wrap(authSocket));
 
+///
+// TicTacToe
+const prepareTTTGame = (clients) => {
+  let playerOne;
+  let playerTwo;
+  if (Math.random() < 0.5) {
+    playerOne = clients[0];
+    playerTwo = clients[1];
+  } else {
+    playerOne = clients[1];
+    playerTwo = clients[0];
+  }
+  // console.log("player one: ", playerOne.user);
+  playerOne.emit("TicTacToeStart", 1, playerTwo.user.username);
+  playerTwo.emit("TicTacToeStart", 2, playerOne.user.username);
+};
+
+///
+
 io.on("connection", (socket) => {
   console.log(`a user connected with as: ${socket.user}`);
   socket.emit("get-user-rooms", socket.user.rooms);
@@ -53,7 +72,15 @@ io.on("connection", (socket) => {
       { $addToSet: { rooms: foundRoom.roomName } }
     );
     socket.join(foundRoom.roomName);
-    callback({ roomName: foundRoom.roomName, messages: foundRoom.messages });
+    if (foundRoom.roomName === "TicTacToe") socket.join("TicTacToeOpponent");
+    // const clients = io.sockets.adapter.rooms.get("TicTacToeOpponent");
+    const clients = await io.in("TicTacToeOpponent").fetchSockets();
+    if (clients.length >= 2) prepareTTTGame(clients);
+    // console.log(clients ? clients.get(socket.id) : null);
+    callback({
+      roomName: foundRoom.roomName,
+      messages: foundRoom.messages,
+    });
   });
 
   socket.on("leave-room", (room) => {
@@ -65,6 +92,12 @@ io.on("connection", (socket) => {
       // console.log("no room message: ", message);
       // console.log("username: ", socket.user.username);
       socket.broadcast.emit("receiveMessages", {
+        message,
+        username: socket.user.username,
+        time,
+      });
+    } else if (room === "TicTacToe") {
+      socket.to(room).emit("receiveMessages", {
         message,
         username: socket.user.username,
         time,
@@ -96,6 +129,12 @@ io.on("connection", (socket) => {
         time,
       });
     }
+  });
+
+  socket.on("tttPlayerMove", (fields) => {
+    const opponent = socket.user.username;
+    // console.log(opponent, fields);
+    socket.in("TicTacToeOpponent").emit("TicTacToeOpponent", opponent, fields);
   });
 
   socket.on("disconnect", () => {
